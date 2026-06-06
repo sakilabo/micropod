@@ -5,7 +5,21 @@ name: test
 on:
   push:
     branches: [main]
+    paths-ignore:
+      - '**/*.md'
+      - 'LICENSE'
+      - '.gitattributes'
+      - '.gitignore'
+      - '.vscode/**'
+      - 'build/**'
   pull_request:
+    paths-ignore:
+      - '**/*.md'
+      - 'LICENSE'
+      - '.gitattributes'
+      - '.gitignore'
+      - '.vscode/**'
+      - 'build/**'
   workflow_dispatch:
   workflow_call:
 
