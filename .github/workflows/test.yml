@@ -23,21 +23,38 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { distro: alpine, file: Dockerfile.alpine, platform: linux/arm64 }
-          - { distro: alpine, file: Dockerfile.alpine, platform: linux/arm/v7 }
-          - { distro: debian, file: Dockerfile.debian, platform: linux/arm64 }
-          - { distro: debian, file: Dockerfile.debian, platform: linux/arm/v7 }
+          - { distro: alpine, file: Dockerfile.alpine, platform: linux/arm64,  arch: arm64 }
+          - { distro: alpine, file: Dockerfile.alpine, platform: linux/arm/v7, arch: armv7 }
+          - { distro: debian, file: Dockerfile.debian, platform: linux/arm64,  arch: arm64 }
+          - { distro: debian, file: Dockerfile.debian, platform: linux/arm/v7, arch: armv7 }
           # armv5 is debian-only; runs under QEMU (qemu-arm), as on a device.
-          - { distro: debian, file: Dockerfile.debian, platform: linux/arm/v5 }
+          - { distro: debian, file: Dockerfile.debian, platform: linux/arm/v5, arch: armv5 }
     steps:
       - name: Checkout
         uses: actions/checkout@v6
 
+      # Cache scope = git hash of the build inputs (this distro's Dockerfile +
+      # rootfs) + arch. Same source -> same hash, so the same commit's test and
+      # the later release reuse the same layers (identical packages); a source
+      # change rotates it. The arch suffix is required: a gha cache key is
+      # single-writer, so parallel legs can't share one scope — only one would
+      # win the reserve and the rest fail to store.
+      - name: Compute cache scope
+        id: cache
+        run: echo "hash=$(git rev-parse "HEAD:rootfs" "HEAD:${{ matrix.file }}" | sha256sum | cut -c1-16)" >> "$GITHUB_OUTPUT"
+
+      # binfmt image / buildx binary are cheap to fetch; caching them only
+      # races the immutable gha key (the "Unable to reserve cache" notices)
+      # for no real gain. The build LAYER cache below is the one worth keeping.
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v4
+        with:
+          cache-image: false
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v4
+        with:
+          cache-binary: false
 
       - name: Build base for ${{ matrix.platform }} (load)
         uses: docker/build-push-action@v7
@@ -48,7 +65,8 @@ jobs:
           load: true
           provenance: false
           tags: micropod:test
-          cache-from: type=gha
+          cache-from: type=gha,scope=${{ steps.cache.outputs.hash }}-${{ matrix.arch }}
+          cache-to: type=gha,mode=max,scope=${{ steps.cache.outputs.hash }}-${{ matrix.arch }}
 
       - name: Smoke test (boot s6, supervise a service, graceful stop)
         run: |

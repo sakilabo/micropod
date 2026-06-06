@@ -32,20 +32,42 @@ jobs:
           - distro: alpine
             file: Dockerfile.alpine
             platforms: linux/arm64,linux/arm/v7
+            arches: arm64 armv7
           # Debian (slim) carries armv5 (armel) in addition.
           - distro: debian
             file: Dockerfile.debian
             platforms: linux/arm64,linux/arm/v7,linux/arm/v5
+            arches: arm64 armv7 armv5
 
     steps:
       - name: Checkout
         uses: actions/checkout@v6
 
+      # binfmt image / buildx binary caching only races the immutable gha key
+      # for no real gain; skip it. The build LAYER cache below is kept.
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v4
+        with:
+          cache-image: false
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v4
+        with:
+          cache-binary: false
+
+      # This multi-arch build reuses the per-arch layers the matching commit's
+      # test wrote. Same hash formula as test.yml (this distro's Dockerfile +
+      # rootfs); cache-from lists one scope per arch (test writes per-arch
+      # because a gha key is single-writer — see test.yml).
+      - name: Compute cache scopes
+        id: cache
+        run: |
+          h=$(git rev-parse "HEAD:rootfs" "HEAD:${{ matrix.file }}" | sha256sum | cut -c1-16)
+          {
+            echo "from<<EOF"
+            for a in ${{ matrix.arches }}; do echo "type=gha,scope=${h}-${a}"; done
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
 
       - name: Log in to ${{ env.REGISTRY }}
         uses: docker/login-action@v4
@@ -80,5 +102,6 @@ jobs:
           # picky about manifests it doesn't recognise, so keep it clean.
           provenance: false
           sbom: false
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          # Read the per-arch caches test wrote; the release ships those exact
+          # layers. No cache-to: test (the gate) is the producer.
+          cache-from: ${{ steps.cache.outputs.from }}
