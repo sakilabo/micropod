@@ -12,11 +12,10 @@ MikroTik RouterOS 環境で、1つのコンテナに複数サービスを実装�
 
 イメージは `ghcr.io/sakilabo/micropod` で公開されています。
 
-| タグ     | ベース               | arm64 | armv7 | armv5 |
-| -------- | -------------------- | :---: | :---: | :---: |
-| `alpine` | `alpine:3.23`        |   ✅   |   ✅   |   ❌   |
-| `debian` | `debian:trixie-slim` |   ✅   |   ✅   |   ✅   |
-| `latest` | → `alpine`           |       |       |       |
+| タグ               | ベース               | arm64 | armv7 | armv5 |
+| ------------------ | -------------------- | :---: | :---: | :---: |
+| `alpine`           | `alpine:3.23`        |  ✅  |  ✅  |  ❌  |
+| `debian`, `latest` | `debian:trixie-slim` |  ✅  |  ✅  |  ✅  |
 
 ## 起動方法
 

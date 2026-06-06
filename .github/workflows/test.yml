@@ -1,9 +1,6 @@
 name: test
 
-# Smoke-test each architecture (incl. armv5 under QEMU). The base must boot
-# busybox init -> s6-svscan, supervise a service, and stop cleanly. Runs on
-# push/tag/PR; also reused by publish.yml (workflow_call) to gate publishing.
-# This workflow never pushes images — publishing is manual (see publish.yml).
+# Also the gate publish.yml runs before a release (workflow_call).
 
 on:
   push:
@@ -26,25 +23,18 @@ jobs:
           - { distro: alpine, file: Dockerfile.alpine, platform: linux/arm/v7, arch: armv7 }
           - { distro: debian, file: Dockerfile.debian, platform: linux/arm64,  arch: arm64 }
           - { distro: debian, file: Dockerfile.debian, platform: linux/arm/v7, arch: armv7 }
-          # armv5 is debian-only; runs under QEMU (qemu-arm), as on a device.
           - { distro: debian, file: Dockerfile.debian, platform: linux/arm/v5, arch: armv5 }
     steps:
       - name: Checkout
         uses: actions/checkout@v6
 
-      # Cache scope = git hash of the build inputs (this distro's Dockerfile +
-      # rootfs) + arch. Same source -> same hash, so the same commit's test and
-      # the later release reuse the same layers (identical packages); a source
-      # change rotates it. The arch suffix is required: a gha cache key is
-      # single-writer, so parallel legs can't share one scope — only one would
-      # win the reserve and the rest fail to store.
+      # scope = hash(Dockerfile+rootfs)+arch. Per-arch because a gha key is
+      # single-writer: parallel legs can't share one scope.
       - name: Compute cache scope
         id: cache
         run: echo "hash=$(git rev-parse "HEAD:rootfs" "HEAD:${{ matrix.file }}" | sha256sum | cut -c1-16)" >> "$GITHUB_OUTPUT"
 
-      # binfmt image / buildx binary are cheap to fetch; caching them only
-      # races the immutable gha key (the "Unable to reserve cache" notices)
-      # for no real gain. The build LAYER cache below is the one worth keeping.
+      # skip binfmt/buildx caching: cheap to fetch, only races the gha key
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v4
         with:
@@ -78,10 +68,8 @@ jobs:
           docker run -d --platform "${{ matrix.platform }}" \
             -v "$PWD/svc/hello:/etc/s6/sv/hello" --name mp micropod:test
 
-          # QEMU is slow — poll for the service to come up (up to ~30s).
-          # Capture output and match with `case`; never pipe a producer into
-          # `grep -q`, which exits on first match and SIGPIPEs the producer ->
-          # exit 141 under `set -o pipefail` (a timing/arch-dependent race).
+          # poll up to ~30s. match captured output with `case`; piping into
+          # `grep -q` SIGPIPEs the producer -> exit 141 under pipefail.
           for _ in $(seq 30); do
             logs=$(docker logs mp 2>&1)
             case "$logs" in *"micropod: hello started"*) break;; esac
@@ -96,9 +84,8 @@ jobs:
           case "$top"  in *s6-svscan*)                 ;; *) echo "FAIL: no s6-svscan";    exit 1;; esac
           case "$top"  in *s6-supervise*)              ;; *) echo "FAIL: no s6-supervise"; exit 1;; esac
 
-          # graceful stop: the default entrypoint runs s6-svscan as PID 1, so
-          # SIGTERM (RouterOS stop / `docker stop`) fires .s6-svscan/SIGTERM ->
-          # s6-svscanctl -t, bringing services down before the SIGKILL timeout.
+          # graceful stop: SIGTERM to PID1 (s6-svscan) -> .s6-svscan/SIGTERM
+          # -> s6-svscanctl -t, before the SIGKILL timeout.
           t0=$(date +%s); docker stop -t 20 mp >/dev/null; t1=$(date +%s)
           echo "stop took $((t1 - t0))s"
           test $((t1 - t0)) -lt 15

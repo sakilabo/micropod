@@ -12,11 +12,10 @@ A base image for running multiple services in a single container on MikroTik Rou
 
 The images are published at `ghcr.io/sakilabo/micropod`.
 
-| Tag      | Base                 | arm64 | armv7 | armv5 |
-| -------- | -------------------- | :---: | :---: | :---: |
-| `alpine` | `alpine:3.23`        |   ✅   |   ✅   |   ❌   |
-| `debian` | `debian:trixie-slim` |   ✅   |   ✅   |   ✅   |
-| `latest` | → `alpine`           |       |       |       |
+| Tag                | Base                 | arm64 | armv7 | armv5 |
+| ------------------ | -------------------- | :---: | :---: | :---: |
+| `alpine`           | `alpine:3.23`        |  ✅  |  ✅  |  ❌  |
+| `debian`, `latest` | `debian:trixie-slim` |  ✅  |  ✅  |  ✅  |
 
 ## Startup
 

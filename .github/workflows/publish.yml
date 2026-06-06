@@ -1,12 +1,9 @@
 name: publish
 
-# Manual-only. Builds the multi-arch images and pushes them to GHCR, gated on
-# the test workflow passing. Dispatch this from the Actions tab (or
-# `gh workflow run publish.yml --ref <branch-or-tag>`):
-#   - from a `v*` tag  -> also emits version tags (e.g. 0.1.0-*, 0.1-*)
-#   - from any ref     -> updates the rolling alpine/debian/latest tags
+# Runs on a v* tag, gated on the test workflow.
 on:
-  workflow_dispatch:
+  push:
+    tags: ['v*']
 
 env:
   REGISTRY: ghcr.io
@@ -17,7 +14,7 @@ permissions:
   packages: write
 
 jobs:
-  # Re-run the smoke tests as a gate before any push.
+  # gate: tests must pass before publishing
   test:
     uses: ./.github/workflows/test.yml
 
@@ -28,12 +25,12 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          # Alpine has no armv5 build — arm64 + armv7 only.
+          # alpine has no armv5
           - distro: alpine
             file: Dockerfile.alpine
             platforms: linux/arm64,linux/arm/v7
             arches: arm64 armv7
-          # Debian (slim) carries armv5 (armel) in addition.
+          # debian adds armv5 (armel)
           - distro: debian
             file: Dockerfile.debian
             platforms: linux/arm64,linux/arm/v7,linux/arm/v5
@@ -43,8 +40,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6
 
-      # binfmt image / buildx binary caching only races the immutable gha key
-      # for no real gain; skip it. The build LAYER cache below is kept.
+      # skip binfmt/buildx caching: cheap to fetch, only races the gha key
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v4
         with:
@@ -55,10 +51,7 @@ jobs:
         with:
           cache-binary: false
 
-      # This multi-arch build reuses the per-arch layers the matching commit's
-      # test wrote. Same hash formula as test.yml (this distro's Dockerfile +
-      # rootfs); cache-from lists one scope per arch (test writes per-arch
-      # because a gha key is single-writer — see test.yml).
+      # cache-from = the same per-arch scopes test wrote
       - name: Compute cache scopes
         id: cache
         run: |
@@ -81,12 +74,14 @@ jobs:
         uses: docker/metadata-action@v6
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          # set latest explicitly below, not auto from the semver tag
+          flavor: latest=false
           tags: |
             type=raw,value=${{ matrix.distro }}
             type=semver,pattern={{version}},suffix=-${{ matrix.distro }}
             type=semver,pattern={{major}}.{{minor}},suffix=-${{ matrix.distro }}
-            # `latest` points at alpine (smallest); manual publish only.
-            type=raw,value=latest,enable=${{ matrix.distro == 'alpine' }}
+            # latest -> debian (the only variant with armv5)
+            type=raw,value=latest,enable=${{ matrix.distro == 'debian' }}
 
       - name: Build and push
         uses: docker/build-push-action@v7
@@ -97,11 +92,8 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          # Emit a plain multi-arch manifest list, without the extra
-          # attestation/provenance manifests. RouterOS' container pull is
-          # picky about manifests it doesn't recognise, so keep it clean.
+          # plain manifest list (no attestation): RouterOS' pull is picky
           provenance: false
           sbom: false
-          # Read the per-arch caches test wrote; the release ships those exact
-          # layers. No cache-to: test (the gate) is the producer.
+          # no cache-to: test is the producer
           cache-from: ${{ steps.cache.outputs.from }}
