@@ -1,0 +1,4 @@
+/.claude/
+/.vscode/*
+!.vscode/tasks.json
+/build/out/

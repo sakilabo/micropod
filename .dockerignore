@@ -1,0 +1,10 @@
+.dockerignore
+.git
+.gitignore
+.gitattributes
+.github
+.claude
+.vscode
+build
+LICENSE
+*.md

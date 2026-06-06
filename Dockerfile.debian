@@ -1,0 +1,47 @@
+# syntax=docker/dockerfile:1
+
+# micropod — Debian (slim) base for MikroTik RouterOS containers.
+#   Tag:       debian
+#   Platforms: linux/arm64, linux/arm/v7, linux/arm/v5
+#
+# armv5 (armel) is debian-only; trixie is the last Debian release with armel.
+
+ARG DEBIAN_VERSION=trixie
+FROM debian:${DEBIAN_VERSION}-slim
+
+RUN --mount=type=bind,source=rootfs,target=/rootfs <<EOF
+set -e
+
+# Install packages
+apt-get update
+apt-get install -y --no-install-recommends busybox s6 dropbear-bin nano
+rm -rf /var/lib/apt/lists/*
+
+# Link busybox applets Debian lacks
+ln -sf /usr/bin/busybox /sbin/init
+ln -sf /usr/bin/busybox /usr/sbin/crond
+ln -sf /usr/bin/busybox /usr/sbin/udhcpc
+
+cp -a /rootfs/. /
+
+# Copy files and set permissions
+find /etc/s6/sv -name run -type f -exec chmod 0755 {} +
+chmod 0755 /etc/s6/sv/.s6-svscan/*
+chmod 0755 /etc/udhcpc/default.script
+
+# Install busybox applets
+mkdir -p /usr/share/busybox/bin
+/usr/bin/busybox --install -s /usr/share/busybox/bin
+
+# Prepare cron directories
+mkdir -p /etc/crontabs /var/spool/cron
+ln -sfn /etc/crontabs /var/spool/cron/crontabs
+
+# Prepare dropbear directories
+mkdir -p /etc/dropbear
+mkdir -p /root/.ssh && chmod 0700 /root/.ssh
+EOF
+
+ENV PATH="${PATH}:/usr/share/busybox/bin"
+
+ENTRYPOINT ["/usr/bin/s6-svscan", "/etc/s6/sv"]

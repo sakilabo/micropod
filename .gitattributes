@@ -1,0 +1,4 @@
+# Scripts copied into the image must stay LF — a CRLF shebang (#!/bin/sh\r)
+# fails to exec on the device. Pin LF regardless of a contributor's core.autocrlf.
+* text=auto eol=lf
+*.tar binary

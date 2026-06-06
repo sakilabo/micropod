@@ -1,0 +1,85 @@
+name: test
+
+# Smoke-test each architecture (incl. armv5 under QEMU). The base must boot
+# busybox init -> s6-svscan, supervise a service, and stop cleanly. Runs on
+# push/tag/PR; also reused by publish.yml (workflow_call) to gate publishing.
+# This workflow never pushes images — publishing is manual (see publish.yml).
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+  workflow_dispatch:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { distro: alpine, file: Dockerfile.alpine, platform: linux/arm64 }
+          - { distro: alpine, file: Dockerfile.alpine, platform: linux/arm/v7 }
+          - { distro: debian, file: Dockerfile.debian, platform: linux/arm64 }
+          - { distro: debian, file: Dockerfile.debian, platform: linux/arm/v7 }
+          # armv5 is debian-only; runs under QEMU (qemu-arm), as on a device.
+          - { distro: debian, file: Dockerfile.debian, platform: linux/arm/v5 }
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Build base for ${{ matrix.platform }} (load)
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: ${{ matrix.file }}
+          platforms: ${{ matrix.platform }}
+          load: true
+          provenance: false
+          tags: micropod:test
+          cache-from: type=gha
+
+      - name: Smoke test (boot s6, supervise a service, graceful stop)
+        run: |
+          set -euo pipefail
+          # a sample s6 service, dropped into the scan dir at runtime
+          mkdir -p svc/hello
+          printf '#!/bin/sh\necho "micropod: hello started"\nexec tail -f /dev/null\n' > svc/hello/run
+          chmod 0755 svc/hello/run
+
+          docker run -d --platform "${{ matrix.platform }}" \
+            -v "$PWD/svc/hello:/etc/s6/sv/hello" --name mp micropod:test
+
+          # QEMU is slow — poll for the service to come up (up to ~30s)
+          for _ in $(seq 30); do
+            docker logs mp 2>&1 | grep -q 'micropod: hello started' && break
+            sleep 1
+          done
+
+          echo "=== logs ==="; docker logs mp 2>&1 || true
+          echo "=== top ===";  docker top  mp     || true
+
+          docker logs mp 2>&1 | grep -q 'micropod: hello started'
+          docker top  mp | grep -q 's6-svscan'
+          docker top  mp | grep -q 's6-supervise'
+
+          # graceful stop: the default entrypoint runs s6-svscan as PID 1, so
+          # SIGTERM (RouterOS stop / `docker stop`) fires .s6-svscan/SIGTERM ->
+          # s6-svscanctl -t, bringing services down before the SIGKILL timeout.
+          t0=$(date +%s); docker stop -t 20 mp >/dev/null; t1=$(date +%s)
+          echo "stop took $((t1 - t0))s"
+          test $((t1 - t0)) -lt 15
+
+          docker rm -f mp >/dev/null
+          echo "PASS ${{ matrix.distro }} ${{ matrix.platform }}"

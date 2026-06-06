@@ -1,0 +1,26 @@
+#!/bin/sh
+# micropod: busybox udhcpc lease handler. Applies the lease — address, default
+# route, and /etc/resolv.conf (DNS). Writing resolv.conf is the point: RouterOS
+# only seeds a container's resolv.conf from the add-time dns= parameter (which
+# can't be changed later), so the in-container DHCP client is how DNS gets set.
+RESOLV=/etc/resolv.conf
+case "$1" in
+deconfig)
+	ip -4 addr flush dev "$interface"
+	;;
+bound | renew)
+	ip -4 addr add "$ip/$mask" ${broadcast:+broadcast "$broadcast"} dev "$interface"
+	ip link set "$interface" up
+	if [ -n "$router" ]; then
+		while ip -4 route del default dev "$interface" 2>/dev/null; do :; done
+		for r in $router; do
+			ip -4 route add default via "$r" dev "$interface"
+		done
+	fi
+	if [ -n "$dns" ]; then
+		: > "$RESOLV"
+		[ -n "$domain" ] && echo "search $domain" >> "$RESOLV"
+		for d in $dns; do echo "nameserver $d" >> "$RESOLV"; done
+	fi
+	;;
+esac

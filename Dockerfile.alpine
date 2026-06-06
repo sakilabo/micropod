@@ -1,0 +1,36 @@
+# syntax=docker/dockerfile:1
+
+# micropod — Alpine base for MikroTik RouterOS containers.
+#   Tag:       alpine
+#   Platforms: linux/arm64, linux/arm/v7
+
+ARG ALPINE_VERSION=3.23
+FROM alpine:${ALPINE_VERSION}
+
+RUN --mount=type=bind,source=rootfs,target=/rootfs <<EOF
+set -e
+apk add --no-cache s6 dropbear nano
+cp -a /rootfs/. /
+
+# Copy files and set permissions
+find /etc/s6/sv -name run -type f -exec chmod 0755 {} +
+chmod 0755 /etc/s6/sv/.s6-svscan/*
+chmod 0755 /etc/udhcpc/default.script
+
+# Install busybox applets
+mkdir -p /usr/share/busybox/bin
+/bin/busybox --install -s /usr/share/busybox/bin
+
+# Prepare cron directories
+mkdir -p /etc/crontabs /var/spool/cron
+ln -sfn /etc/crontabs /var/spool/cron/crontabs
+
+# Prepare dropbear directories
+mkdir -p /etc/dropbear
+mkdir -p /root/.ssh && chmod 0700 /root/.ssh
+EOF
+
+# Add PATH to busybox applets
+ENV PATH="${PATH}:/usr/share/busybox/bin"
+
+ENTRYPOINT ["/usr/bin/s6-svscan", "/etc/s6/sv"]

@@ -1,0 +1,15 @@
+# /etc/inittab — micropod
+#
+# busybox init is PID 1. Its only job: start the s6 supervision tree, then
+# wait (reaping zombies). s6 supervises the services; init does not respawn
+# it. No getty/console lines — this is a container.
+#
+# Add services as s6 service directories under /etc/s6/sv/<name>/ (each with
+# a `run` script). Nothing in this file changes when you add a service.
+
+# Start s6-svscan once; do not respawn it.
+::once:/usr/bin/s6-svscan /etc/s6/sv
+
+# Graceful stop: on SIGTERM (RouterOS stop / `docker stop`), bring the s6
+# services down before init terminates everything else.
+::shutdown:/usr/bin/s6-svscanctl -t /etc/s6/sv

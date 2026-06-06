@@ -1,0 +1,134 @@
+{
+  // micropod test harness wired into VS Code's task runner.
+  // Run via: Terminal > Run Task… (or Ctrl+Shift+P → "Tasks: Run Task").
+  // The default *test* task (Ctrl+Shift+P → "Tasks: Run Test Task") is build + verify.
+  // run.ps1 takes a mandatory -Mode (build | tar | cleanup); no default run.
+  // Shell differs per OS: Windows PowerShell (powershell.exe) vs PowerShell Core (pwsh) on Linux/macOS.
+  // The run.ps1 script itself is shared.
+  "version": "2.0.0",
+  "windows": {
+    "options": {
+      "shell": {
+        "executable": "powershell.exe",
+        "args": [
+          "-NoProfile",
+          "-ExecutionPolicy",
+          "Bypass",
+          "-File"
+        ]
+      }
+    }
+  },
+  "linux": {
+    "options": {
+      "shell": {
+        "executable": "pwsh",
+        "args": [
+          "-NoProfile",
+          "-File"
+        ]
+      }
+    }
+  },
+  "osx": {
+    "options": {
+      "shell": {
+        "executable": "pwsh",
+        "args": [
+          "-NoProfile",
+          "-File"
+        ]
+      }
+    }
+  },
+  "tasks": [
+    {
+      "label": "build + test: all tags",
+      "detail": "Build + boot + verify every tag (alpine-arm64,armv7 · debian-arm64,armv7,armv5). Keeps base images.",
+      "type": "shell",
+      "command": "${workspaceFolder}/build/run.ps1",
+      "args": [
+        "-Mode",
+        "build"
+      ],
+      "group": {
+        "kind": "test",
+        "isDefault": true
+      },
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated",
+        "clear": true
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "build + test: pick tag",
+      "detail": "Build + verify a single tag (prompts which one).",
+      "type": "shell",
+      "command": "${workspaceFolder}/build/run.ps1",
+      "args": [
+        "-Mode",
+        "build",
+        "-Tag",
+        "${input:tag}"
+      ],
+      "group": "test",
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated",
+        "clear": true
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "create tar files",
+      "detail": "Package built base images into RouterOS-loadable tars in build/out/ (run build + test first).",
+      "type": "shell",
+      "command": "${workspaceFolder}/build/run.ps1",
+      "args": [
+        "-Mode",
+        "tar"
+      ],
+      "group": "test",
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated",
+        "clear": true
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "cleanup docker images",
+      "detail": "Remove ALL micropod:* images.",
+      "type": "shell",
+      "command": "${workspaceFolder}/build/run.ps1",
+      "args": [
+        "-Mode",
+        "cleanup"
+      ],
+      "group": "test",
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated",
+        "clear": true
+      },
+      "problemMatcher": []
+    }
+  ],
+  "inputs": [
+    {
+      "id": "tag",
+      "type": "pickString",
+      "description": "Which tag?",
+      "options": [
+        "alpine-arm64",
+        "alpine-armv7",
+        "debian-arm64",
+        "debian-armv7",
+        "debian-armv5"
+      ],
+      "default": "debian-armv5"
+    }
+  ]
+}

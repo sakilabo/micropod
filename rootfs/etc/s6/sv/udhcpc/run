@@ -1,0 +1,19 @@
+#!/bin/sh
+# Put resolv.conf on tmpfs (/dev/shm) so the DHCP client's DNS writes avoid the
+# flash-backed overlay — but only when there is no resolv.conf yet. An existing
+# one (deployer- or RouterOS-provided) is left untouched. Done at runtime, not
+# baked: the image builder bind-mounts /etc/resolv.conf so it can't be created
+# at build time (also bind-mounted under plain Docker, where this is a no-op).
+# -e is false on our pre-lease dangling symlink, so -L guards the retry loop
+# from rewriting it.
+[ -e /etc/resolv.conf ] || [ -L /etc/resolv.conf ] \
+	|| ln -sf /dev/shm/resolv.conf /etc/resolv.conf 2>/dev/null
+
+# RouterOS names the veth per its config (e.g. veth-local), so use the first
+# non-loopback interface rather than assuming eth0.
+for dev in /sys/class/net/*; do
+	iface=${dev##*/}
+	[ "$iface" = lo ] && continue
+	exec udhcpc -i "$iface" -f -s /etc/udhcpc/default.script
+done
+sleep 1   # no interface yet — fall through and let s6 restart us to retry

@@ -1,0 +1,8 @@
+#!/bin/sh
+# Seed root's crontab on first start (don't clobber an existing one).
+mkdir -p /etc/crontabs
+[ -e /etc/crontabs/root ] || cat > /etc/crontabs/root <<'EOF'
+# root's crontab — edit with: crontab -e
+# fields: minute hour day-of-month month day-of-week command
+EOF
+exec crond -f -c /etc/crontabs -L /dev/stderr
