@@ -2,3 +2,7 @@
 # fails to exec on the device. Pin LF regardless of a contributor's core.autocrlf.
 * text=auto eol=lf
 *.tar binary
+
+# language bar: count only the Dockerfiles
+* linguist-documentation
+Dockerfile.* linguist-documentation=false linguist-language=Dockerfile
