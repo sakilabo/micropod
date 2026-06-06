@@ -61,18 +61,23 @@ jobs:
           docker run -d --platform "${{ matrix.platform }}" \
             -v "$PWD/svc/hello:/etc/s6/sv/hello" --name mp micropod:test
 
-          # QEMU is slow — poll for the service to come up (up to ~30s)
+          # QEMU is slow — poll for the service to come up (up to ~30s).
+          # Capture output and match with `case`; never pipe a producer into
+          # `grep -q`, which exits on first match and SIGPIPEs the producer ->
+          # exit 141 under `set -o pipefail` (a timing/arch-dependent race).
           for _ in $(seq 30); do
-            docker logs mp 2>&1 | grep -q 'micropod: hello started' && break
+            logs=$(docker logs mp 2>&1)
+            case "$logs" in *"micropod: hello started"*) break;; esac
             sleep 1
           done
+          top=$(docker top mp || true)
 
-          echo "=== logs ==="; docker logs mp 2>&1 || true
-          echo "=== top ===";  docker top  mp     || true
+          echo "=== logs ==="; printf '%s\n' "$logs"
+          echo "=== top ===";  printf '%s\n' "$top"
 
-          docker logs mp 2>&1 | grep -q 'micropod: hello started'
-          docker top  mp | grep -q 's6-svscan'
-          docker top  mp | grep -q 's6-supervise'
+          case "$logs" in *"micropod: hello started"*) ;; *) echo "FAIL: no service log";  exit 1;; esac
+          case "$top"  in *s6-svscan*)                 ;; *) echo "FAIL: no s6-svscan";    exit 1;; esac
+          case "$top"  in *s6-supervise*)              ;; *) echo "FAIL: no s6-supervise"; exit 1;; esac
 
           # graceful stop: the default entrypoint runs s6-svscan as PID 1, so
           # SIGTERM (RouterOS stop / `docker stop`) fires .s6-svscan/SIGTERM ->
