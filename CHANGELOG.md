@@ -5,6 +5,14 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0/).
 
+## [0.2.0] - 2026-06-09
+
+### Changed
+
+- Disabled apt recommends in the Debian image, trimming the installed package set.
+- Overhauled the build system: replaced `build/run.ps1` with Python scripts (`build.py`, `export.py`, `cleanup.py`, `get-oci2mtk.py`).
+- Switched the RouterOS export conversion from podman (`docker-archive`) to the external `oci2mtk` tool, producing a proper RouterOS-importable image.
+
 ## [0.1.1] - 2026-06-06
 
 ### Changed
@@ -22,5 +30,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - BusyBox applets available on `PATH` under `/usr/share/busybox/bin`.
 - Published to `ghcr.io/sakilabo/micropod` with `alpine`, `debian`, and `latest` tags.
 
+[0.2.0]: https://github.com/sakilabo/micropod/compare/v0.1.1...v0.2.0
 [0.1.1]: https://github.com/sakilabo/micropod/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/sakilabo/micropod/releases/tag/v0.1.0
