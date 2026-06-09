@@ -1,119 +1,68 @@
 {
   // micropod test harness wired into VS Code's task runner.
-  // Run via: Terminal > Run Task… (or Ctrl+Shift+P → "Tasks: Run Task").
-  // The default *test* task (Ctrl+Shift+P → "Tasks: Run Test Task") is build + verify.
-  // run.ps1 takes a mandatory -Mode (build | tar | cleanup); no default run.
-  // Shell differs per OS: Windows PowerShell (powershell.exe) vs PowerShell Core (pwsh) on Linux/macOS.
-  // The run.ps1 script itself is shared.
+  // Tasks invoke the build/*.py scripts directly via python.
   "version": "2.0.0",
-  "windows": {
-    "options": {
-      "shell": {
-        "executable": "powershell.exe",
-        "args": [
-          "-NoProfile",
-          "-ExecutionPolicy",
-          "Bypass",
-          "-File"
-        ]
-      }
-    }
-  },
-  "linux": {
-    "options": {
-      "shell": {
-        "executable": "pwsh",
-        "args": [
-          "-NoProfile",
-          "-File"
-        ]
-      }
-    }
-  },
-  "osx": {
-    "options": {
-      "shell": {
-        "executable": "pwsh",
-        "args": [
-          "-NoProfile",
-          "-File"
-        ]
-      }
-    }
-  },
   "tasks": [
     {
-      "label": "build + test: all tags",
-      "detail": "Build + boot + verify every tag (alpine-arm64,armv7 · debian-arm64,armv7,armv5). Keeps base images.",
-      "type": "shell",
-      "command": "${workspaceFolder}/build/run.ps1",
+      "label": "Build and test: all tags",
+      "detail": "Docker images are kept.",
+      "type": "process",
+      "command": "python",
       "args": [
-        "-Mode",
-        "build"
+        "${workspaceFolder}/build/build.py"
       ],
       "group": {
         "kind": "test",
         "isDefault": true
       },
-      "presentation": {
-        "reveal": "always",
-        "panel": "dedicated",
-        "clear": true
-      },
-      "problemMatcher": []
+      "problemMatcher": [],
     },
     {
-      "label": "build + test: pick tag",
-      "detail": "Build + verify a single tag (prompts which one).",
-      "type": "shell",
-      "command": "${workspaceFolder}/build/run.ps1",
+      "label": "Build and test: pick tag",
+      "detail": "Select a tag to run.",
+      "type": "process",
+      "command": "python",
       "args": [
-        "-Mode",
-        "build",
-        "-Tag",
+        "${workspaceFolder}/build/build.py",
+        "--tag",
         "${input:tag}"
       ],
       "group": "test",
-      "presentation": {
-        "reveal": "always",
-        "panel": "dedicated",
-        "clear": true
-      },
-      "problemMatcher": []
+      "problemMatcher": [],
     },
     {
-      "label": "create tar files",
-      "detail": "Package built base images into RouterOS-loadable tars in build/out/ (run build + test first).",
-      "type": "shell",
-      "command": "${workspaceFolder}/build/run.ps1",
+      "label": "Build: all tags",
+      "detail": "Builds Docker images without testing.",
+      "type": "process",
+      "command": "python",
       "args": [
-        "-Mode",
-        "tar"
+        "${workspaceFolder}/build/build.py",
+        "--without-test"
       ],
-      "group": "test",
-      "presentation": {
-        "reveal": "always",
-        "panel": "dedicated",
-        "clear": true
+      "group": {
+        "kind": "build",
+        "isDefault": true
       },
-      "problemMatcher": []
+      "problemMatcher": [],
     },
     {
-      "label": "cleanup docker images",
-      "detail": "Remove ALL micropod:* images.",
-      "type": "shell",
-      "command": "${workspaceFolder}/build/run.ps1",
+      "label": "Export docker image to .tar.gz",
+      "detail": "RouterOS-loadable, into build/out/. Build first.",
+      "type": "process",
+      "command": "python",
       "args": [
-        "-Mode",
-        "cleanup"
+        "${workspaceFolder}/build/export.py"
       ],
-      "group": "test",
-      "presentation": {
-        "reveal": "always",
-        "panel": "dedicated",
-        "clear": true
-      },
-      "problemMatcher": []
+      "problemMatcher": [],
+    },
+    {
+      "label": "Cleanup docker images",
+      "detail": "Removes micropod:* images from Docker.",
+      "type": "process",
+      "command": "python",
+      "args": [
+        "${workspaceFolder}/build/cleanup.py"
+      ],
     }
   ],
   "inputs": [
@@ -128,7 +77,7 @@
         "debian-armv7",
         "debian-armv5"
       ],
-      "default": "debian-armv5"
+      "default": "alpine-armv7"
     }
   ]
 }
