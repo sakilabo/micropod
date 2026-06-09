@@ -13,8 +13,9 @@ RUN --mount=type=bind,source=rootfs,target=/rootfs <<EOF
 set -e
 
 # Install packages
+echo 'APT::Install-Recommends "false";' > /etc/apt/apt.conf.d/99norecommends
 apt-get update
-apt-get install -y --no-install-recommends busybox s6 dropbear-bin nano
+apt-get install -y busybox s6 dropbear-bin nano
 rm -rf /var/lib/apt/lists/*
 
 # Link busybox applets Debian lacks
