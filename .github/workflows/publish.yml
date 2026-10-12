@@ -1,9 +1,13 @@
 name: publish
 
-# Runs on a v* tag, gated on the test workflow.
+# Runs manually for an existing release tag, gated on the test workflow.
 on:
-  push:
-    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Existing release tag (for example, v0.3.0)'
+        required: true
+        type: string
 
 env:
   REGISTRY: ghcr.io
@@ -14,12 +18,28 @@ permissions:
   packages: write
 
 jobs:
+  resolve:
+    runs-on: ubuntu-latest
+    outputs:
+      sha: ${{ steps.commit.outputs.sha }}
+    steps:
+      - name: Checkout release tag
+        uses: actions/checkout@v6
+        with:
+          ref: refs/tags/${{ inputs.tag }}
+      - name: Resolve release commit
+        id: commit
+        run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
   # gate: tests must pass before publishing
   test:
+    needs: resolve
     uses: ./.github/workflows/test.yml
+    with:
+      ref: ${{ needs.resolve.outputs.sha }}
 
   publish:
-    needs: test
+    needs: [resolve, test]
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -39,6 +59,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v6
+        with:
+          ref: ${{ needs.resolve.outputs.sha }}
 
       # skip binfmt/buildx caching: cheap to fetch, only races the gha key
       - name: Set up QEMU
@@ -78,8 +100,8 @@ jobs:
           flavor: latest=false
           tags: |
             type=raw,value=${{ matrix.distro }}
-            type=semver,pattern={{version}},suffix=-${{ matrix.distro }}
-            type=semver,pattern={{major}}.{{minor}},suffix=-${{ matrix.distro }}
+            type=semver,pattern={{version}},value=${{ inputs.tag }},suffix=-${{ matrix.distro }}
+            type=semver,pattern={{major}}.{{minor}},value=${{ inputs.tag }},suffix=-${{ matrix.distro }}
             # latest -> debian (the only variant with armv5)
             type=raw,value=latest,enable=${{ matrix.distro == 'debian' }}
 
