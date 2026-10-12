@@ -5,6 +5,16 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0/).
 
+## [0.3.0] - 2026-10-12
+
+### Changed
+
+- Updated the Alpine base image from the 3.23 series to 3.24.
+
+### Fixed
+
+- Fixed local smoke-test bind mounts under MSYS2 Python while retaining Windows Python support.
+
 ## [0.2.0] - 2026-06-09
 
 ### Changed
@@ -30,6 +40,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - BusyBox applets available on `PATH` under `/usr/share/busybox/bin`.
 - Published to `ghcr.io/sakilabo/micropod` with `alpine`, `debian`, and `latest` tags.
 
+[0.3.0]: https://github.com/sakilabo/micropod/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/sakilabo/micropod/compare/v0.1.1...v0.2.0
 [0.1.1]: https://github.com/sakilabo/micropod/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/sakilabo/micropod/releases/tag/v0.1.0

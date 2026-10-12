@@ -116,7 +116,7 @@ PID   USER     TIME  COMMAND
 | Tag                | Base                 | arm64 | armv7 | armv5 |
 | ------------------ | -------------------- | :---: | :---: | :---: |
 | `debian`, `latest` | `debian:trixie-slim` |  ✅  |  ✅  |  ✅  |
-| `alpine`           | `alpine:3.23`        |  ✅  |  ✅  |  ❌  |
+| `alpine`           | `alpine:3.24`        |  ✅  |  ✅  |  ❌  |
 
 ## Startup
 

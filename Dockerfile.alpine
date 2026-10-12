@@ -4,7 +4,7 @@
 #   Tag:       alpine
 #   Platforms: linux/arm64, linux/arm/v7
 
-ARG ALPINE_VERSION=3.23
+ARG ALPINE_VERSION=3.24
 FROM alpine:${ALPINE_VERSION}
 
 RUN --mount=type=bind,source=rootfs,target=/rootfs <<EOF

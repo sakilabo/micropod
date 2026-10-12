@@ -136,9 +136,15 @@ def test_one(tag):
         if sys.platform != "win32":
             os.chmod(run, 0o755)
 
+        # Convert only the host path. MSYS2 rewrites both sides of a -v
+        # argument, including the Linux container path.
+        source = str(svc)
+        if sys.platform in {"cygwin", "msys"}:
+            source = subprocess.check_output(["cygpath", "-m", source], text=True).strip()
+
         subprocess.run(["docker", "rm", "-f", cname], capture_output=True)
         started = subprocess.run(
-            ["docker", "run", "-d", "--platform", plat, "--name", cname, "-v", f"{svc}:/etc/s6/sv/hello", base],
+            ["docker", "run", "-d", "--platform", plat, "--name", cname, "--mount", f"type=bind,source={source},target=/etc/s6/sv/hello", base],
             capture_output=True,
         )
         if started.returncode != 0:

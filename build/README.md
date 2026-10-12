@@ -13,6 +13,7 @@ Three Python scripts, run directly with `python`. Targets are tags (`--tag`), ea
 ## Prerequisites
 
 - Python 3.
+  - Windows Python and MSYS2 `/usr/bin/python` are supported. MSYS2 uses its bundled `cygpath` to convert the host bind-mount path to Windows format; the container path stays in Linux format.
 - Docker:
   - A running Docker daemon, `docker buildx` on `PATH`.
   - QEMU emulators for the target platforms; build.py registers them via `tonistiigi/binfmt` if missing (Docker Desktop already ships them).
