@@ -2,6 +2,8 @@
 set -e
 
 /bin/mkdir -p /run/sshd
+/bin/chown 0:0 /run/sshd
+/bin/chmod 0755 /run/sshd
 /usr/bin/ssh-keygen -A
 
 # OpenSSH passes TZ through but supplies its own default PATH.

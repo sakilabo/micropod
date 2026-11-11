@@ -78,7 +78,7 @@ jobs:
           cache-from: type=gha,scope=${{ steps.cache.outputs.hash }}-${{ matrix.arch }}
           cache-to: type=gha,mode=max,scope=${{ steps.cache.outputs.hash }}-${{ matrix.arch }}
 
-      - name: Smoke test (boot s6, supervise a service, graceful stop)
+      - name: Smoke test (boot s6, connect to sshd, graceful stop)
         run: |
           set -euo pipefail
           # a sample s6 service, dropped into the scan dir at runtime
@@ -87,7 +87,13 @@ jobs:
           chmod 0755 svc/hello/run
 
           docker run -d --platform "${{ matrix.platform }}" \
-            -v "$PWD/svc/hello:/etc/s6/sv/hello" --name mp micropod:test
+            -v "$PWD/svc/hello:/etc/s6/sv/hello" -p 127.0.0.1::22 \
+            --name mp --entrypoint /bin/sh micropod:test -ec '
+              mkdir -p /run/sshd
+              chown 1:1 /run/sshd
+              chmod 0777 /run/sshd
+              exec /usr/local/bin/micropod-svscan
+            '
 
           # poll up to ~30s. match captured output with `case`; piping into
           # `grep -q` SIGPIPEs the producer -> exit 141 under pipefail.
@@ -104,6 +110,16 @@ jobs:
           case "$logs" in *"micropod: hello started"*) ;; *) echo "FAIL: no service log";  exit 1;; esac
           case "$top"  in *s6-svscan*)                 ;; *) echo "FAIL: no s6-svscan";    exit 1;; esac
           case "$top"  in *s6-supervise*)              ;; *) echo "FAIL: no s6-supervise"; exit 1;; esac
+
+          # sshd must fix the pre-existing runtime directory before accepting SSH.
+          port=$(docker port mp 22/tcp)
+          for _ in $(seq 30); do
+            host_key=$(ssh-keyscan -T 2 -t ed25519 -p "${port##*:}" 127.0.0.1 2>/dev/null || true)
+            if [ -n "$host_key" ]; then break; fi
+            sleep 1
+          done
+          test "$(docker exec mp /usr/share/busybox/bin/stat -c '%u:%g:%a' /run/sshd)" = 0:0:755
+          test -n "$host_key"
 
           # graceful stop: SIGTERM to PID1 (s6-svscan) -> .s6-svscan/SIGTERM
           # -> s6-svscanctl -t, before the SIGKILL timeout.

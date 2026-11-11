@@ -1,13 +1,8 @@
 name: publish
 
-# Runs manually for an existing release tag, gated on the test workflow.
+# Select a release tag in Run workflow. Tests gate image publishing.
 on:
   workflow_dispatch:
-    inputs:
-      tag:
-        description: 'Existing release tag (for example, v0.3.0)'
-        required: true
-        type: string
 
 env:
   REGISTRY: ghcr.io
@@ -23,13 +18,14 @@ jobs:
     outputs:
       sha: ${{ steps.commit.outputs.sha }}
     steps:
-      - name: Checkout release tag
-        uses: actions/checkout@v6
-        with:
-          ref: refs/tags/${{ inputs.tag }}
       - name: Resolve release commit
         id: commit
-        run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+        run: |
+          if [ "$GITHUB_REF_TYPE" != tag ]; then
+            echo "::error::Select a release tag when running this workflow."
+            exit 1
+          fi
+          echo "sha=$GITHUB_SHA" >> "$GITHUB_OUTPUT"
 
   # gate: tests must pass before publishing
   test:
@@ -101,8 +97,8 @@ jobs:
           flavor: latest=false
           tags: |
             type=raw,value=${{ matrix.distro }}
-            type=semver,pattern={{version}},value=${{ inputs.tag }},suffix=-${{ matrix.distro }}
-            type=semver,pattern={{major}}.{{minor}},value=${{ inputs.tag }},suffix=-${{ matrix.distro }}
+            type=semver,pattern={{version}},value=${{ github.ref_name }},suffix=-${{ matrix.distro }}
+            type=semver,pattern={{major}}.{{minor}},value=${{ github.ref_name }},suffix=-${{ matrix.distro }}
             # latest -> debian (the only variant with armv5)
             type=raw,value=latest,enable=${{ matrix.distro == 'debian' }}
 
