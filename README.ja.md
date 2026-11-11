@@ -95,7 +95,7 @@ Flags が `S (stopped)` になっていることを確認し、以下のコマ�
 /container/shell 0
 ```
 
-コンテナに接続したら、サービスが動作していることを確認してみましょう。`crond`, `sshd (dropbear)`, `udhcpc` が動作しているはずです。
+コンテナに接続したら、`crond`、`sshd`（OpenSSH）、`udhcpc` が動作していることを確認します。
 
 ```
 / # ps aux
@@ -105,7 +105,7 @@ PID   USER     TIME  COMMAND
     3 root      0:00 s6-supervise sshd
     4 root      0:00 s6-supervise crond
     5 root      0:00 udhcpc -i veth-local -f -s /etc/udhcpc/default.script
-    6 root      0:00 dropbear -F -E -R
+    6 root      0:00 sshd: /usr/sbin/sshd -D -e ... [listener]
     7 root      0:00 crond -f -c /etc/crontabs -L /dev/stderr
    17 root      0:00 /bin/sh
    18 root      0:00 ps aux
@@ -122,9 +122,9 @@ PID   USER     TIME  COMMAND
 
 micropod には2つの起動方法があります。
 
-### `ENTRYPOINT ["/usr/bin/s6-svscan", "/etc/s6/sv"]` (初期設定)
+### `ENTRYPOINT ["/usr/local/bin/micropod-svscan"]` (初期設定)
 
-- 最小のリソースで動作します。
+- 必要に応じて既定の `PATH` を設定し、`s6-svscan` を起動します。
 - `inittab` は使えません。
 
 ### `ENTRYPOINT ["/sbin/init"]`
@@ -141,10 +141,16 @@ micropod には2つの起動方法があります。
 | サービス | 実装       | ディレクトリ        | 備考                                                         |
 | -------- | ---------- | ------------------- | ------------------------------------------------------------ |
 | `crond`  | `BusyBox`  | `/etc/s6/sv/crond`  | crontab は `/etc/crontabs/<user>` に置く。                   |
-| `sshd`   | `dropbear` | `/etc/s6/sv/sshd`   | 有効化するにはパスワードまたは `authorized_keys` を設定する。 |
+| `sshd`   | `OpenSSH`  | `/etc/s6/sv/sshd`   | SSH・SFTP に対応。ログインにはパスワードまたは `authorized_keys` を設定する。 |
 | `udhcpc` | `BusyBox`  | `/etc/s6/sv/udhcpc` | DHCP クライアント。`/etc/resolv.conf` を上書きする。         |
 
 `udhcpc` の対象インターフェースは、辞書順で最初に発見された非ループバックインターフェースとなります。
+
+### SSH・SFTP
+
+SSH セッションは SSH サービスの `TZ` と `PATH` を引き継ぎます。初期設定の起動方法ではコンテナの環境変数を使い、`PATH` が未設定または空の場合は標準のシステムパスを使います。`inittab` を使う場合は BusyBox の `init` が設定した `PATH` を使います。SSH サービスは `/usr/share/busybox/bin` が `PATH` に含まれていなければ追加します。RouterOS でタイムゾーンを指定するには、コンテナの `envlist` に `TZ`（例 `Asia/Tokyo`）を設定します。
+
+OpenSSH は初回起動時に `/etc/ssh` にホスト鍵を生成します。Dropbear から移行すると、クライアントから見えるサーバーのホスト鍵が変わります。既存の `/root/.ssh/authorized_keys` は引き続き使えます。
 
 ### サービスの管理方法
 

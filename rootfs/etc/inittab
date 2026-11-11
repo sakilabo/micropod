@@ -8,7 +8,7 @@
 # a `run` script). Nothing in this file changes when you add a service.
 
 # Start s6-svscan once; do not respawn it.
-::once:/usr/bin/s6-svscan /etc/s6/sv
+::once:/usr/local/bin/micropod-svscan
 
 # Graceful stop: on SIGTERM (RouterOS stop / `docker stop`), bring the s6
 # services down before init terminates everything else.

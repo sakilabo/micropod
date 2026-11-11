@@ -95,7 +95,7 @@ The container starts in a few seconds. Once Flags shows `R (running)`, the conta
 /container/shell 0
 ```
 
-Once connected, check that the services are running. `crond`, `sshd (dropbear)`, and `udhcpc` should be running.
+Once connected, check that the services are running. `crond`, `sshd` (OpenSSH), and `udhcpc` should be running.
 
 ```
 / # ps aux
@@ -105,7 +105,7 @@ PID   USER     TIME  COMMAND
     3 root      0:00 s6-supervise sshd
     4 root      0:00 s6-supervise crond
     5 root      0:00 udhcpc -i veth-local -f -s /etc/udhcpc/default.script
-    6 root      0:00 dropbear -F -E -R
+    6 root      0:00 sshd: /usr/sbin/sshd -D -e ... [listener]
     7 root      0:00 crond -f -c /etc/crontabs -L /dev/stderr
    17 root      0:00 /bin/sh
    18 root      0:00 ps aux
@@ -122,9 +122,9 @@ PID   USER     TIME  COMMAND
 
 micropod has two startup methods.
 
-### `ENTRYPOINT ["/usr/bin/s6-svscan", "/etc/s6/sv"]` (default)
+### `ENTRYPOINT ["/usr/local/bin/micropod-svscan"]` (default)
 
-- Runs with minimal resources.
+- Runs `s6-svscan` after supplying a default `PATH` if needed.
 - `inittab` is not available.
 
 ### `ENTRYPOINT ["/sbin/init"]`
@@ -141,10 +141,16 @@ Three services run out of the box.
 | Service  | Implementation | Directory           | Notes                                                       |
 | -------- | -------------- | ------------------- | ----------------------------------------------------------- |
 | `crond`  | `BusyBox`      | `/etc/s6/sv/crond`  | Place crontabs at `/etc/crontabs/<user>`.                   |
-| `sshd`   | `dropbear`     | `/etc/s6/sv/sshd`   | To enable it, set a password or `authorized_keys`.          |
+| `sshd`   | `OpenSSH`      | `/etc/s6/sv/sshd`   | SSH and SFTP. Set a password or `authorized_keys` to log in. |
 | `udhcpc` | `BusyBox`      | `/etc/s6/sv/udhcpc` | DHCP client. Overwrites `/etc/resolv.conf`.                 |
 
 `udhcpc` targets the first non-loopback interface discovered in lexical order.
+
+### SSH and SFTP
+
+SSH sessions inherit the SSH service's `TZ` and `PATH`. With the default entrypoint, these values come from the container environment, with a standard system `PATH` as a fallback. BusyBox `init` supplies its own system `PATH` in `inittab` mode. The SSH service adds `/usr/share/busybox/bin` if needed. To set the timezone on RouterOS, set `TZ` (for example, `Asia/Tokyo`) in the container's `envlist`.
+
+OpenSSH generates its host keys in `/etc/ssh` on first start. When migrating from Dropbear, clients will see new server host keys. The existing `/root/.ssh/authorized_keys` file can be reused.
 
 ### Managing services
 

@@ -1,2 +1,15 @@
 #!/bin/sh
-exec dropbear -F -E -R
+set -e
+
+/bin/mkdir -p /run/sshd
+/usr/bin/ssh-keygen -A
+
+# OpenSSH passes TZ through but supplies its own default PATH.
+session_path=${PATH:-/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin}
+case ":$session_path:" in
+    *:/usr/share/busybox/bin:*) ;;
+    *) session_path=$session_path:/usr/share/busybox/bin ;;
+esac
+session_path=$(printf '%s' "$session_path" | /bin/sed 's/[\\"]/\\&/g')
+
+exec /usr/sbin/sshd -D -e -o "SetEnv \"PATH=$session_path\""

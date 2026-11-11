@@ -15,7 +15,10 @@ set -e
 # Install packages
 echo 'APT::Install-Recommends "false";' > /etc/apt/apt.conf.d/99norecommends
 apt-get update
-apt-get install -y busybox s6 dropbear-bin nano
+# OpenSSH needs sysusers for its service account. s6 is the service manager.
+apt-get install -y busybox s6 openssh-server systemd-standalone-sysusers nano
+# The package generates host keys during installation. Generate them per container instead.
+rm -f /etc/ssh/ssh_host_*_key /etc/ssh/ssh_host_*_key.pub
 rm -rf /var/lib/apt/lists/*
 
 # Link busybox applets Debian lacks
@@ -29,6 +32,7 @@ cp -a /rootfs/. /
 find /etc/s6/sv -name run -type f -exec chmod 0755 {} +
 chmod 0755 /etc/s6/sv/.s6-svscan/*
 chmod 0755 /etc/udhcpc/default.script
+chmod 0755 /usr/local/bin/micropod-svscan
 
 # Install busybox applets
 mkdir -p /usr/share/busybox/bin
@@ -38,11 +42,12 @@ mkdir -p /usr/share/busybox/bin
 mkdir -p /etc/crontabs /var/spool/cron
 ln -sfn /etc/crontabs /var/spool/cron/crontabs
 
-# Prepare dropbear directories
-mkdir -p /etc/dropbear
+# Keep the SSH session PATH when a login shell reads /etc/profile.
+sed -i '/^[[:space:]]*PATH=/s/PATH=/[ -n "$SSH_CONNECTION" ] || PATH=/' /etc/profile
+
 mkdir -p /root/.ssh && chmod 0700 /root/.ssh
 EOF
 
 ENV PATH="${PATH}:/usr/share/busybox/bin"
 
-ENTRYPOINT ["/usr/bin/s6-svscan", "/etc/s6/sv"]
+ENTRYPOINT ["/usr/local/bin/micropod-svscan"]

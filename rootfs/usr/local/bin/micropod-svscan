@@ -1,0 +1,6 @@
+#!/bin/sh
+
+# Read the inherited value before falling back to the system paths.
+startup_path=$(/bin/printenv PATH) || startup_path=
+export PATH="${startup_path:-/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin}"
+exec /usr/bin/s6-svscan /etc/s6/sv "$@"
